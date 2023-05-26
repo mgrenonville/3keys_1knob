@@ -118,6 +118,56 @@ void KBD_print(char* str) {
 }
 
 // ===================================================================================
+// Press with modifier and keycode
+// ===================================================================================
+void KBD_code_press(uint8_t mod, uint8_t code) {
+  uint8_t i;
+
+  if(!code) return;                             // no valid code
+
+  KBD_report[1] |= mod;                         // add modifiers
+
+  // Check if code is already present in report
+  for(i=3; i<9; i++) {
+    if(KBD_report[i] == code) return;           // return if already in report
+  }
+
+  // Find an empty slot, insert code and transmit report
+  for(i=3; i<9; i++) {
+    if(KBD_report[i] == 0) {                    // empty slot?
+      KBD_report[i] = code;                     // insert code
+      KBD_sendReport();                         // send report
+      return;                                   // and return
+    }
+  }
+}
+
+// ===================================================================================
+// Release with modifier and keycode
+// ===================================================================================
+void KBD_code_release(uint8_t mod, uint8_t code) {
+  uint8_t i;
+
+  if(!code) return;                             // no valid code
+
+  KBD_report[1] &= ~mod;                        // remove modifiers
+
+  // Delete code in report
+  for(i=3; i<9; i++) {
+    if(KBD_report[i] == code) KBD_report[i] = 0;// delete code in report
+  }
+  KBD_sendReport();                             // send report
+}
+
+// ===================================================================================
+// Type (press and release) with modifier and keycode
+// ===================================================================================
+void KBD_code_type(uint8_t mod, uint8_t code) {
+  KBD_code_press(mod, code);
+  KBD_code_release(mod, code);
+}
+
+// ===================================================================================
 // Press a consumer key on keyboard
 // ===================================================================================
 void CON_press(uint16_t key) {
