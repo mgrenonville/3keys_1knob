@@ -55,9 +55,17 @@ void USB_ISR(void) __interrupt(INT_NO_USB) {
   USB_interrupt();
 }
 
+enum KeyType {
+    KEYBOARD = 0,
+    CONSUMER = 1,
+};
+
+#define KEY_EEPROM_FIELDS 3
+
 // structur with key details
 struct key {
   uint8_t mod;
+  enum KeyType type;
   char code;
   uint8_t last;
 };
@@ -88,12 +96,20 @@ void handle_key(uint8_t current, struct key * key, uint8_t * neo) {
   if(current != key->last) {                // state changed?
     key->last = current;                    // update last state flag
     if(current) {                           // key was pressed?
-      KBD_code_press(key->mod, key->code);  // press
+      if(key->type == KEYBOARD) {
+        KBD_code_press(key->mod, key->code); // press keyboard/keypad key
+      } else {
+        CON_press(key->code); // press consumer key
+      }
       if(neo) *neo = NEO_MAX;               // light up corresponding NeoPixel
     }
     else {                                  // key was released?
-      KBD_code_release(key->mod,
-                       key->code);          // release
+      if(key->type == KEYBOARD) {
+        KBD_code_release(key->mod,
+                         key->code);          // release
+      } else {
+        CON_release(key->code);          // release
+      }
     }
   }
   else if(key->last) {                      // key still being pressed?
@@ -128,8 +144,9 @@ void main(void) {
 
   // TODO: Read eeprom for key characters
   for (i = 0; i < 6; i++) {
-    keys[i].mod = (char)eeprom_read_byte(i * 2);
-    keys[i].code = (char)eeprom_read_byte(i * 2 + 1);
+    keys[i].mod = (char)eeprom_read_byte(i * KEY_EEPROM_FIELDS);
+    keys[i].type = eeprom_read_byte(i * KEY_EEPROM_FIELDS + 1);
+    keys[i].code = (char)eeprom_read_byte(i * KEY_EEPROM_FIELDS + 2);
     keys[i].last = 0;
   }
 
@@ -154,8 +171,12 @@ void main(void) {
     }
 
     if(currentKnobKey) {
-      KBD_code_type(currentKnobKey->mod,
-                    currentKnobKey->code);           // press and release corresponding key ...
+      if(currentKnobKey->type == KEYBOARD) {
+        KBD_code_type(currentKnobKey->mod,
+                      currentKnobKey->code);        // press and release corresponding key ...
+      } else {
+        CON_type(currentKnobKey->code);             // press and release corresponding key ...
+      }
     }
 
     // Update NeoPixels
