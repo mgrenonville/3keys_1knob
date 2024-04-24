@@ -16,8 +16,8 @@
 // NeoPixel configuration
 #define NEO_GRB                         // type of pixel: NEO_GRB or NEO_RGB
 #define NEO_MIN             0
-#define NEO_GLOW            8
-#define NEO_MAX             127
+#define NEO_GLOW            0.4
+#define NEO_MAX             1.0
 
 // USB device descriptor
 #define USB_VENDOR_ID       0x1189      // VID
