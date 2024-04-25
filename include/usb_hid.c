@@ -13,7 +13,14 @@
 // ===================================================================================
 
 volatile __bit HID_EP1_writeBusyFlag = 0;                   // upload pointer busy flag
+volatile __xdata uint8_t USBByteCountEP2 = 0; // Bytes of received data on USB endpoint
+volatile __xdata uint8_t USBBufOutPointEP2 = 0; // Data pointer for fetching
 
+
+
+
+// uint8_t   SetupReq,SetupLen,Ready,Count,FLAG,UsbConfig;
+uint8_t   len,i;
 // ===================================================================================
 // Front End Functions
 // ===================================================================================
@@ -50,6 +57,21 @@ void HID_setup(void) {
   UEP2_3_MOD  = bUEP2_RX_EN;                // EP2 RX enable
 }
 
+
+uint8_t HID_available() { return USBByteCountEP2; }
+
+char HID_read() {
+  if (USBByteCountEP2 == 0)
+    return 0;
+  __data char data = EP2_buffer[USBBufOutPointEP2];
+  USBBufOutPointEP2++;
+  USBByteCountEP2--;
+  if (USBByteCountEP2 == 0) {
+    UEP2_CTRL = UEP2_CTRL & ~MASK_UEP_R_RES | UEP_R_RES_ACK;
+  }
+  return data;
+}
+
 // Reset HID parameters
 void HID_reset(void) {
   UEP1_CTRL = bUEP_AUTO_TOG | UEP_T_RES_NAK;
@@ -66,4 +88,13 @@ void HID_EP1_IN(void) {
 
 // Endpoint 2 OUT handler (HID report transfer from host)
 void HID_EP2_OUT(void) {                                    // auto response
+  if (U_TOG_OK) // Discard unsynchronized packets
+  {
+    USBByteCountEP2 = USB_RX_LEN;
+    USBBufOutPointEP2 = 0; // Reset Data pointer for fetching
+    if (USBByteCountEP2)
+      UEP2_CTRL = UEP2_CTRL & ~MASK_UEP_R_RES |
+                  UEP_R_RES_NAK; // Respond NAK after a packet. Let main code
+                                 // change response after handling.
+  }
 }
