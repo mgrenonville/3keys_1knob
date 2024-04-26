@@ -70,7 +70,7 @@ __code USB_CFG_DESCR_HID CfgDescr = {
   .ep1IN = {
     .bLength            = sizeof(USB_ENDP_DESCR), // size of the descriptor in bytes: 7
     .bDescriptorType    = USB_DESCR_TYP_ENDP,     // endpoint descriptor: 0x05
-    .bEndpointAddress   = USB_ENDP_ADDR_EP1_IN,   // endpoint: 1, direction: IN (0x01)
+    .bEndpointAddress   = USB_ENDP_ADDR_EP1_IN,   // endpoint: 1, direction: IN (0x81)
     .bmAttributes       = USB_ENDP_TYPE_INTER,    // transfer type: interrupt (0x03)
     .wMaxPacketSize     = EP1_SIZE,               // max packet size
     .bInterval          = 10                      // polling intervall in ms
@@ -80,7 +80,7 @@ __code USB_CFG_DESCR_HID CfgDescr = {
   .ep2OUT = {
     .bLength            = sizeof(USB_ENDP_DESCR), // size of the descriptor in bytes: 7
     .bDescriptorType    = USB_DESCR_TYP_ENDP,     // endpoint descriptor: 0x05
-    .bEndpointAddress   = USB_ENDP_ADDR_EP2_OUT,  // endpoint: 1, direction: IN (0x82)
+    .bEndpointAddress   = USB_ENDP_ADDR_EP2_OUT,  // endpoint: 2, direction: OUT (0x02)
     .bmAttributes       = USB_ENDP_TYPE_INTER,    // transfer type: interrupt (0x03)
     .wMaxPacketSize     = EP2_SIZE,               // max packet size
     .bInterval          = 10                      // polling intervall in ms
@@ -94,7 +94,7 @@ __code uint8_t ReportDescr[] ={
     0x05, 0x01,                    // USAGE_PAGE (Generic Desktop)
     0x09, 0x06,                    // USAGE (Keyboard)
     0xa1, 0x01,                    // COLLECTION (Application)
-    0x85, 0x01,                    //   REPORT_ID (1)
+    0x85, USB_SEND_REPORT_KEYBOARD_PAGE_ID,                    //   REPORT_ID (1)
     0x05, 0x07,                    //   USAGE_PAGE (Keyboard)
     0x19, 0xe0,                    //   USAGE_MINIMUM (Keyboard LeftControl)
     0x29, 0xe7,                    //   USAGE_MAXIMUM (Keyboard Right GUI)
@@ -129,7 +129,7 @@ __code uint8_t ReportDescr[] ={
     0x05, 0x0c,                    // USAGE_PAGE (Consumer Devices)
     0x09, 0x01,                    // USAGE (Consumer Control)
     0xa1, 0x01,                    // COLLECTION (Application)
-    0x85, 0x02,                    //   REPORT_ID (2)
+    0x85, USB_SEND_REPORT_CONSUMER_PAGE_ID,                    //   REPORT_ID (2)
     0x15, 0x00,                    //   LOGICAL_MINIMUM (0)
     0x26, 0xff, 0x03,              //   LOGICAL_MAXIMUM (1023)
     0x19, 0x00,                    //   USAGE_MINIMUM (Unassigned)

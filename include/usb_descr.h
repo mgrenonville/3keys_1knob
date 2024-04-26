@@ -72,3 +72,6 @@ extern __code uint16_t InterfDescr[];
 #define USB_STR_DESCR_i3    (uint8_t*)SerDescr
 #define USB_STR_DESCR_i4    (uint8_t*)InterfDescr
 #define USB_STR_DESCR_ix    (uint8_t*)SerDescr
+
+#define USB_SEND_REPORT_KEYBOARD_PAGE_ID 0x01
+#define USB_SEND_REPORT_CONSUMER_PAGE_ID 0x02

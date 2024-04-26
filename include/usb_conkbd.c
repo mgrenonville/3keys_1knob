@@ -12,8 +12,8 @@
 // ===================================================================================
 // Keyboard HID report
 // ===================================================================================
-__xdata uint8_t  KBD_report[9] = {1,0,0,0,0,0,0,0,0};
-__xdata uint8_t  CON_report[9] = {2,0,0,0,0,0,0,0,0};
+__xdata uint8_t  KBD_report[9] = {USB_SEND_REPORT_KEYBOARD_PAGE_ID,0,0,0,0,0,0,0,0};
+__xdata uint8_t  CON_report[9] = {USB_SEND_REPORT_CONSUMER_PAGE_ID,0,0,0,0,0,0,0,0};
 
 // ===================================================================================
 // ASCII to keycode mapping table

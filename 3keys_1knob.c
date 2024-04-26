@@ -84,7 +84,8 @@ struct RGBColor {
 // ===================================================================================
 
 // Update NeoPixels
-void NEO_update(struct RGBColor *neo) {
+void NEO_update(struct RGBColor *neo,  float *percent) {
+  // percent glowing is not working :(
   EA = 0;                                       // disable interrupts
   NEO_writeColor(neo[0].r, neo[0].g, neo[0].b); // NeoPixel 1 lights up red
   NEO_writeColor(neo[1].r, neo[1].g, neo[1].b); // NeoPixel 2 lights up green
@@ -157,20 +158,12 @@ void main(void) {
   struct RGBColor buttonColors[3];
   float percent[3] = {0.0, 0.0, 0.0};
 
-  for (i = 0; i < 2; i++) {
-    buttonColors[i].r =
-        (char)eeprom_read_byte(i * RGB_EEPROM_FIELDS + (RGB_EEPROM_OFFSET));
-    buttonColors[i].g =
-        (char)eeprom_read_byte(i * RGB_EEPROM_FIELDS + 1 + (RGB_EEPROM_OFFSET));
-    buttonColors[i].b =
-        (char)eeprom_read_byte(i * RGB_EEPROM_FIELDS + 2 + (RGB_EEPROM_OFFSET));
-  }
   // Enter bootloader if key 1 is pressed
   NEO_init();                // init NeoPixels
   if (!PIN_read(PIN_KEY1)) { // key 1 pressed?
     NEO_latch();             // make sure pixels are ready
     for (i = 9; i; i--)
-      NEO_sendByte(NEO_MAX); // light up all pixels
+      NEO_sendByte(255 * NEO_MAX); // light up all pixels
     BOOT_now();              // enter bootloader
   }
 
@@ -186,6 +179,15 @@ void main(void) {
     keys[i].type = eeprom_read_byte(i * KEY_EEPROM_FIELDS + 1);
     keys[i].code = (char)eeprom_read_byte(i * KEY_EEPROM_FIELDS + 2);
     keys[i].last = 0;
+  }
+
+  for (i = 0; i < 3; i++) {
+    buttonColors[i].r =
+        (char)eeprom_read_byte(i * RGB_EEPROM_FIELDS + (RGB_EEPROM_OFFSET));
+    buttonColors[i].g =
+        (char)eeprom_read_byte(i * RGB_EEPROM_FIELDS + 1 + (RGB_EEPROM_OFFSET));
+    buttonColors[i].b =
+        (char)eeprom_read_byte(i * RGB_EEPROM_FIELDS + 2 + (RGB_EEPROM_OFFSET));
   }
 
   // Loop
@@ -220,17 +222,27 @@ void main(void) {
     }
 
     // Update NeoPixels
-    NEO_update(buttonColors);
+    NEO_update(buttonColors, percent);
     for (i = 0; i < 3; i++) {
       if (percent[i] > NEO_GLOW)
-        percent[i] - 0.01; // fade down NeoPixel
+        percent[i] =- 0.01; // fade down NeoPixel
     }
     DLY_ms(5); // latch and debounce
-    // if (CDC_available()) {
-    //   char c = CDC_read(); // read incoming character
-    //   CDC_write(c);        // echo back character
-    //   if (c == '\n')
-    //     CDC_flush(); // flush on newline command
+    i = 0;
+    // if (HID_available()) {
+    //   uint8_t c = HID_read(); // read incoming character
+    //   // eeprom_write_byte(RGB_EEPROM_FIELDS + i, c);   // write to eeprom
+    //   // if (c == 0x01) {
+    //     buttonColors[0].r = 255;
+    //     buttonColors[0].g = 0;
+    //   //   buttonColors[i].g = HID_read();
+    //   //   buttonColors[i].b = HID_read();
+    //   //   i++;
+    //   // }
+      
+    // } else {
+    //     buttonColors[0].g = 255;
+    //     buttonColors[0].r = 255;
     // }
     WDT_reset(); // reset watchdog
   }
