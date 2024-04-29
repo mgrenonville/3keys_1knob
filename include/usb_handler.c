@@ -102,8 +102,11 @@ void USB_EP0_SETUP(void) {
             case USB_DESCR_TYP_REPORT:
               if(USB_setupBuf->wValueL == 0) {
                 pDescr = USB_REPORT_DESCR;
-                len = USB_REPORT_DESCR_LEN;
-              }
+                len = CfgDescr.hid0.wDescriptorLength;
+              } else if(USB_setupBuf->wValueL == 1) {
+                pDescr = USB_RAW_HID_REPORT_DESCR;
+                len = CfgDescr.RawHid1.wDescriptorLength;
+              } 
               else len = 0xff;
               break;
             #endif
