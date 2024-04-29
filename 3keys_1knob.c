@@ -50,10 +50,14 @@
 #include <neo.h>        // NeoPixel functions
 #include <system.h>     // system functions
 #include <usb_conkbd.h> // USB HID consumer keyboard functions
+#include <usb_descr.h>  // system functions
 
 // Prototypes for used interrupts
 void USB_interrupt(void);
 void USB_ISR(void) __interrupt(INT_NO_USB) { USB_interrupt(); }
+
+__xdata __at(EP2_ADDR)
+uint8_t EP2_buffer[EP2_BUF_SIZE];
 
 enum KeyType {
   KEYBOARD = 0,
@@ -84,13 +88,22 @@ struct RGBColor {
 // ===================================================================================
 
 // Update NeoPixels
-void NEO_update(struct RGBColor *neo,  float *percent) {
+void NEO_update(struct RGBColor *neo, float *percent) {
+
+  // if (!KBD_CAPS_LOCK_state) {
+  //   EA = 0;                  // disable interrupts
+  //   NEO_writeColor(0, 0, 0); // NeoPixel 1 OFF
+  //   NEO_writeColor(0, 0, 0); // NeoPixel 2 OFF
+  //   NEO_writeColor(0, 0, 0); // NeoPixel 3 OFF
+  //   EA = 1;                  // enable interrupts
+  // } else {
   // percent glowing is not working :(
   EA = 0;                                       // disable interrupts
   NEO_writeColor(neo[0].r, neo[0].g, neo[0].b); // NeoPixel 1 lights up red
   NEO_writeColor(neo[1].r, neo[1].g, neo[1].b); // NeoPixel 2 lights up green
   NEO_writeColor(neo[2].r, neo[2].g, neo[2].b); // NeoPixel 3 lights up blue
   EA = 1;                                       // enable interrupts
+  // }
 }
 
 // Read EEPROM (stolen from
@@ -143,7 +156,8 @@ void handle_key(uint8_t current, struct key *key, float *neo) {
       }
     }
   } else if (key->last) { // key still being pressed?
-    // if(neo) *neo = NEO_MAX;                 // keep NeoPixel on
+                          // if(neo) *neo = NEO_MAX;                 // keep
+                          // NeoPixel on
   }
 }
 
@@ -164,7 +178,7 @@ void main(void) {
     NEO_latch();             // make sure pixels are ready
     for (i = 9; i; i--)
       NEO_sendByte(255 * NEO_MAX); // light up all pixels
-    BOOT_now();              // enter bootloader
+    BOOT_now();                    // enter bootloader
   }
 
   // Setup
@@ -195,7 +209,7 @@ void main(void) {
     handle_key(!PIN_read(PIN_KEY1), &keys[0], &percent[0]);
     handle_key(!PIN_read(PIN_KEY2), &keys[1], &percent[1]);
     handle_key(!PIN_read(PIN_KEY3), &keys[2], &percent[2]);
-    handle_key(!PIN_read(PIN_ENC_SW), &keys[3], (void * )0);
+    handle_key(!PIN_read(PIN_ENC_SW), &keys[3], (void *)0);
 
     // Handle knob
     currentKnobKey = 0;         // clear key variable
@@ -225,10 +239,27 @@ void main(void) {
     NEO_update(buttonColors, percent);
     for (i = 0; i < 3; i++) {
       if (percent[i] > NEO_GLOW)
-        percent[i] =- 0.01; // fade down NeoPixel
+        percent[i] = -0.01; // fade down NeoPixel
     }
-    DLY_ms(5); // latch and debounce
-    i = 0;
+    DLY_ms(5);                     // latch and debounce
+
+    //https://github.com/DeqingSun/ch55xduino/blob/ch55xduino/ch55xduino/ch55x/libraries/Generic_Examples/examples/05.USB/qmkCompatibleKeyboard/src/userQmkCompatibleKeyboard/via.c
+    // See this project for how to handle HID packets and declare a new HID raw interface.
+    if (HID_available()) {         // received data packet?
+      i = HID_available();         // get number of bytes in packet
+      if (EP2_buffer[0] == 1 && !((KBD_getState() >> 1) & 1)) { // LED Capslock = 1
+        buttonColors[0].r = 255;
+      } else {
+        buttonColors[0].r = 0; // pass all bytes in packet to I2C
+      }
+      while (i--)
+        HID_read(); // read and discard all bytes
+
+      // HID_ack(); // acknowledge packet
+    } else {
+      buttonColors[0].r = 255;
+    }
+
     // if (HID_available()) {
     //   uint8_t c = HID_read(); // read incoming character
     //   // eeprom_write_byte(RGB_EEPROM_FIELDS + i, c);   // write to eeprom
@@ -239,7 +270,7 @@ void main(void) {
     //   //   buttonColors[i].b = HID_read();
     //   //   i++;
     //   // }
-      
+
     // } else {
     //     buttonColors[0].g = 255;
     //     buttonColors[0].r = 255;

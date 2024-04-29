@@ -1,0 +1,8 @@
+import hid
+
+h = hid.device()
+h.open(0x1189, 0x8890)
+
+
+h.write([1,255,0,0])
+h.close()
