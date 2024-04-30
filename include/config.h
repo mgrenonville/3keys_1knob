@@ -20,8 +20,8 @@
 #define NEO_MAX             1.0
 
 // USB device descriptor
-#define USB_VENDOR_ID       0x1189      // VID
-#define USB_PRODUCT_ID      0x8890      // PID
+#define USB_VENDOR_ID       0x4249      // VID
+#define USB_PRODUCT_ID      0x4287      // PID
 #define USB_DEVICE_VERSION  0x0100      // v1.0 (BCD-format)
 
 // USB configuration descriptor

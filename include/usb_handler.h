@@ -22,7 +22,7 @@ uint8_t EP1_buffer[EP1_BUF_SIZE];
 // double-buffering for IN and OUT using 256 bytes for four buffers starting
 // from the UEPn_DMA pointer.
 __xdata __at(EP1_ADDR + 64)
-uint8_t EP1_OUT_buffer[EP1_BUF_SIZE];
+uint8_t EP1_SEND_buffer[EP1_BUF_SIZE];
 __xdata __at(EP2_ADDR)
 uint8_t EP2_buffer[EP2_BUF_SIZE];
 

@@ -32,7 +32,7 @@ void HID_sendReport(__xdata uint8_t *buf, uint8_t len) {
   while (HID_EP1_writeBusyFlag)
     ; // wait for ready to write
   for (i = 0; i < len; i++)
-    EP1_OUT_buffer[i] = buf[i];  // copy report to EP1 buffer
+    EP1_SEND_buffer[i] = buf[i];  // copy report to EP1 buffer
   UEP1_T_LEN = len;          // set length to upload
   HID_EP1_writeBusyFlag = 1; // set busy flag
   UEP1_CTRL = UEP1_CTRL & ~MASK_UEP_T_RES |

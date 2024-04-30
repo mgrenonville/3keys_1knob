@@ -56,16 +56,23 @@
 void USB_interrupt(void);
 void USB_ISR(void) __interrupt(INT_NO_USB) { USB_interrupt(); }
 
-
 enum KeyType {
   KEYBOARD = 0,
   CONSUMER = 1,
 };
 
+enum RawHIDProtocolMessages {
+  SET_RGB = 0x01,
+  PERSIST_COLOR = 0x02,
+  PERSIST_KEYS = 0x03,
+};
+
 #define KEY_EEPROM_FIELDS 3
+#define KEY_COUNT 6
+#define LED_COUNT 3
 #define RGB_EEPROM_FIELDS 3
 
-#define RGB_EEPROM_OFFSET 6 * KEY_EEPROM_FIELDS
+#define RGB_EEPROM_OFFSET KEY_COUNT *KEY_EEPROM_FIELDS
 
 // structur with key details
 struct key {
@@ -86,22 +93,22 @@ struct RGBColor {
 // ===================================================================================
 
 // Update NeoPixels
-void NEO_update(struct RGBColor *neo, float *percent) {
+void NEO_update(struct RGBColor *neo, float *percent, uint8_t state) {
 
-  // if (!KBD_CAPS_LOCK_state) {
-  //   EA = 0;                  // disable interrupts
-  //   NEO_writeColor(0, 0, 0); // NeoPixel 1 OFF
-  //   NEO_writeColor(0, 0, 0); // NeoPixel 2 OFF
-  //   NEO_writeColor(0, 0, 0); // NeoPixel 3 OFF
-  //   EA = 1;                  // enable interrupts
-  // } else {
-  // percent glowing is not working :(
-  EA = 0;                                       // disable interrupts
-  NEO_writeColor(neo[0].r, neo[0].g, neo[0].b); // NeoPixel 1 lights up red
-  NEO_writeColor(neo[1].r, neo[1].g, neo[1].b); // NeoPixel 2 lights up green
-  NEO_writeColor(neo[2].r, neo[2].g, neo[2].b); // NeoPixel 3 lights up blue
-  EA = 1;                                       // enable interrupts
-  // }
+  if (!state) {
+    EA = 0;                  // disable interrupts
+    NEO_writeColor(0, 0, 0); // NeoPixel 1 OFF
+    NEO_writeColor(0, 0, 0); // NeoPixel 2 OFF
+    NEO_writeColor(0, 0, 0); // NeoPixel 3 OFF
+    EA = 1;                  // enable interrupts
+  } else {
+    // percent glowing is not working :(
+    EA = 0;                                       // disable interrupts
+    NEO_writeColor(neo[0].r, neo[0].g, neo[0].b); // NeoPixel 1 lights up red
+    NEO_writeColor(neo[1].r, neo[1].g, neo[1].b); // NeoPixel 2 lights up green
+    NEO_writeColor(neo[2].r, neo[2].g, neo[2].b); // NeoPixel 3 lights up blue
+    EA = 1;                                       // enable interrupts
+  }
 }
 
 // Read EEPROM (stolen from
@@ -164,11 +171,12 @@ void handle_key(uint8_t current, struct key *key, float *neo) {
 // ===================================================================================
 void main(void) {
   // Variables
-  struct key keys[6];         // array of struct for keys
+  struct key keys[KEY_COUNT]; // array of struct for keys
   struct key *currentKnobKey; // current key to be sent by knob
   __idata uint8_t i;          // temp variable
-  struct RGBColor buttonColors[3];
-  float percent[3] = {0.0, 0.0, 0.0};
+  struct RGBColor buttonColors[LED_COUNT];
+  float percent[LED_COUNT] = {0.0, 0.0, 0.0};
+  int state = 0;
 
   // Enter bootloader if key 1 is pressed
   NEO_init();                // init NeoPixels
@@ -234,33 +242,50 @@ void main(void) {
     }
 
     // Update NeoPixels
-    NEO_update(buttonColors, percent);
+    NEO_update(buttonColors, percent, state);
     for (i = 0; i < 3; i++) {
       if (percent[i] > NEO_GLOW)
         percent[i] = -0.01; // fade down NeoPixel
     }
     DLY_ms(5); // latch and debounce
 
-    // https://github.com/DeqingSun/ch55xduino/blob/ch55xduino/ch55xduino/ch55x/libraries/Generic_Examples/examples/05.USB/qmkCompatibleKeyboard/src/userQmkCompatibleKeyboard/via.c
-    //  See this project for how to handle HID packets and declare a new HID raw
-    //  interface.
+    // Handle HID Raw data
     if (HID_available()) { // received data packet?
       i = HID_available(); // get number of bytes in packet
+      i--;
+      int message = HID_read();
+      switch (message) {
+      case SET_RGB:
+        for (int j = 0; j < i / LED_COUNT; j++) {
+          buttonColors[j].r = HID_read();
+          buttonColors[j].g = HID_read();
+          buttonColors[j].b = HID_read();
+        }
+        break;
+      case PERSIST_COLOR:
+        if (i != 4 * KEY_COUNT) {
+          break;
+        } else {
+          while (i--) {
+            int read = HID_read();
+            if (eeprom_read_byte(RGB_EEPROM_OFFSET + i) != read) {
+              // eeprom_write_byte(RGB_EEPROM_OFFSET + i, read);
+            }
+          }
+        }
 
-      // while (i--)
-      //   HID_read(); // read and discard all bytes
+        break;
+      default:
+        break;
+      }
 
       HID_ack(); // acknowledge packet
     }
 
     if (!((HID_statusLed() >> 1) & 1)) { // LED Capslock = 1
-      buttonColors[0].r = 255;
-      buttonColors[0].b = 0;
-      buttonColors[0].g = 0;
+      state = 1;
     } else {
-      buttonColors[0].r = 0; // pass all bytes in packet to I2C
-      buttonColors[0].b = 0;
-      buttonColors[0].g = 0;
+      state = 0;
     }
 
     // if (HID_available()) {
