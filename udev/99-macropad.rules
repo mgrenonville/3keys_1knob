@@ -1,0 +1,6 @@
+SUBSYSTEM=="usb", ATTR{idVendor}=="4249", ATTR{idProduct}=="4287", MODE="0660", GROUP="plugdev", TAG+="uaccess", TAG+="udev-acl", SYMLINK+="macropad%n"
+KERNEL=="hidraw*", ATTRS{idVendor}=="4249", ATTRS{idProduct}=="4287", MODE="0660", GROUP="plugdev", TAG+="uaccess", TAG+="udev-acl"
+
+
+SUBSYSTEM=="usb", ATTR{idVendor}=="4348", ATTR{idProduct}=="55e0", MODE="666"
+

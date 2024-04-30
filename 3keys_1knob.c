@@ -288,21 +288,7 @@ void main(void) {
       state = 0;
     }
 
-    // if (HID_available()) {
-    //   uint8_t c = HID_read(); // read incoming character
-    //   // eeprom_write_byte(RGB_EEPROM_FIELDS + i, c);   // write to eeprom
-    //   // if (c == 0x01) {
-    //     buttonColors[0].r = 255;
-    //     buttonColors[0].g = 0;
-    //   //   buttonColors[i].g = HID_read();
-    //   //   buttonColors[i].b = HID_read();
-    //   //   i++;
-    //   // }
 
-    // } else {
-    //     buttonColors[0].g = 255;
-    //     buttonColors[0].r = 255;
-    // }
     WDT_reset(); // reset watchdog
   }
 }
