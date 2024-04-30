@@ -4,7 +4,7 @@
 
 #pragma once
 #include <stdint.h>
-#include "usb_hid.h"
+#include <usb_hid.h>
 
 // Functions
 #define KBD_init() HID_init()         // init keyboard

@@ -6,6 +6,9 @@
         "string_view": "c",
         "ranges": "c",
         "random": "c",
-        "system.h": "c"
+        "system.h": "c",
+        "neo.h": "c",
+        "usb_descr.h": "c",
+        "usb_conkbd.h": "c"
     }
 }

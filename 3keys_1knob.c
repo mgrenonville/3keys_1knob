@@ -56,8 +56,6 @@
 void USB_interrupt(void);
 void USB_ISR(void) __interrupt(INT_NO_USB) { USB_interrupt(); }
 
-__xdata __at(EP2_ADDR)
-uint8_t EP2_buffer[EP2_BUF_SIZE];
 
 enum KeyType {
   KEYBOARD = 0,
@@ -241,23 +239,28 @@ void main(void) {
       if (percent[i] > NEO_GLOW)
         percent[i] = -0.01; // fade down NeoPixel
     }
-    DLY_ms(5);                     // latch and debounce
+    DLY_ms(5); // latch and debounce
 
-    //https://github.com/DeqingSun/ch55xduino/blob/ch55xduino/ch55xduino/ch55x/libraries/Generic_Examples/examples/05.USB/qmkCompatibleKeyboard/src/userQmkCompatibleKeyboard/via.c
-    // See this project for how to handle HID packets and declare a new HID raw interface.
-    if (HID_available()) {         // received data packet?
-      i = HID_available();         // get number of bytes in packet
-      if (EP2_buffer[0] == 1 && !((KBD_getState() >> 1) & 1)) { // LED Capslock = 1
-        buttonColors[0].r = 255;
-      } else {
-        buttonColors[0].r = 0; // pass all bytes in packet to I2C
-      }
-      while (i--)
-        HID_read(); // read and discard all bytes
+    // https://github.com/DeqingSun/ch55xduino/blob/ch55xduino/ch55xduino/ch55x/libraries/Generic_Examples/examples/05.USB/qmkCompatibleKeyboard/src/userQmkCompatibleKeyboard/via.c
+    //  See this project for how to handle HID packets and declare a new HID raw
+    //  interface.
+    if (HID_available()) { // received data packet?
+      i = HID_available(); // get number of bytes in packet
 
-      // HID_ack(); // acknowledge packet
-    } else {
+      // while (i--)
+      //   HID_read(); // read and discard all bytes
+
+      HID_ack(); // acknowledge packet
+    }
+
+    if (!((HID_statusLed() >> 1) & 1)) { // LED Capslock = 1
       buttonColors[0].r = 255;
+      buttonColors[0].b = 0;
+      buttonColors[0].g = 0;
+    } else {
+      buttonColors[0].r = 0; // pass all bytes in packet to I2C
+      buttonColors[0].b = 0;
+      buttonColors[0].g = 0;
     }
 
     // if (HID_available()) {
