@@ -4,7 +4,7 @@
 
 #pragma once
 #include <stdint.h>
-#include "usb_hid.h"
+#include <usb_hid.h>
 
 // Functions
 #define KBD_init() HID_init()         // init keyboard
@@ -13,6 +13,10 @@ void KBD_release(uint8_t key);        // release a key on keyboard
 void KBD_type(uint8_t key);           // press and release a key on keyboard
 void KBD_releaseAll(void);            // release all keys on keyboard
 void KBD_print(char* str);            // type some text on the keyboard
+
+void KBD_code_press(uint8_t mod, uint8_t code);
+void KBD_code_release(uint8_t mod, uint8_t code);
+void KBD_code_type(uint8_t mod, uint8_t code);
 
 void CON_press(uint16_t key);         // press a consumer key on keyboard
 void CON_release(uint16_t key);       // release a consumer key on keyboard

@@ -93,6 +93,7 @@ class Programmer:
             dev.set_configuration()
         except usb.core.USBError as ex:
             sys.stderr.write('ERROR: Could not access USB Device!\n')
+            sys.stderr.write('ERROR: '+ str(ex))
             if str(ex).startswith('[Errno 13]') and platform.system() == 'Linux':
                 print('Configure udev or execute as root (sudo).')
             raise Exception()

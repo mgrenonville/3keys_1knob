@@ -25,60 +25,145 @@
 // - Clock: min. 12 MHz internal
 // - Adjust the firmware parameters in include/config.h if necessary.
 // - Make sure SDCC toolchain and Python3 with PyUSB is installed.
-// - Press BOOT button on the board and keep it pressed while connecting it via USB
+// - Press BOOT button on the board and keep it pressed while connecting it via
+// USB
 //   with your PC.
 // - Run 'make flash'.
 //
 // Operating Instructions:
 // -----------------------
-// - Connect the board via USB to your PC. It should be detected as a HID keyboard.
+// - Connect the board via USB to your PC. It should be detected as a HID
+// keyboard.
 // - Press a macro key and see what happens.
-// - To enter bootloader hold down key 1 while connecting the MacroPad to USB. All
-//   NeoPixels will light up white as long as the device is in bootloader mode 
+// - To enter bootloader hold down key 1 while connecting the MacroPad to USB.
+// All
+//   NeoPixels will light up white as long as the device is in bootloader mode
 //   (about 10 seconds).
-
 
 // ===================================================================================
 // Libraries, Definitions and Macros
 // ===================================================================================
 
 // Libraries
-#include <config.h>                         // user configurations
-#include <system.h>                         // system functions
-#include <delay.h>                          // delay functions
-#include <neo.h>                            // NeoPixel functions
-#include <usb_conkbd.h>                     // USB HID consumer keyboard functions
+#include <config.h>     // user configurations
+#include <delay.h>      // delay functions
+#include <neo.h>        // NeoPixel functions
+#include <system.h>     // system functions
+#include <usb_conkbd.h> // USB HID consumer keyboard functions
+#include <usb_descr.h>  // system functions
 
 // Prototypes for used interrupts
 void USB_interrupt(void);
-void USB_ISR(void) __interrupt(INT_NO_USB) {
-  USB_interrupt();
-}
+void USB_ISR(void) __interrupt(INT_NO_USB) { USB_interrupt(); }
+
+enum KeyType {
+  KEYBOARD = 0,
+  CONSUMER = 1,
+};
+
+enum RawHIDProtocolMessages {
+  SET_RGB = 0x01,
+  PERSIST_COLOR = 0x02,
+  PERSIST_KEYS = 0x03,
+};
+
+#define KEY_EEPROM_FIELDS 3
+#define KEY_COUNT 6
+#define LED_COUNT 3
+#define RGB_EEPROM_FIELDS 3
+
+#define RGB_EEPROM_OFFSET KEY_COUNT *KEY_EEPROM_FIELDS
+
+// structur with key details
+struct key {
+  uint8_t mod;
+  enum KeyType type;
+  char code;
+  uint8_t last;
+};
+
+struct RGBColor {
+  uint8_t r;
+  uint8_t g;
+  uint8_t b;
+};
 
 // ===================================================================================
 // NeoPixel Functions
 // ===================================================================================
 
-// NeoPixel variables
-__idata uint8_t neo1 = 127;                 // brightness of NeoPixel 1
-__idata uint8_t neo2 = 127;                 // brightness of NeoPixel 2
-__idata uint8_t neo3 = 127;                 // brightness of NeoPixel 3
-
 // Update NeoPixels
-void NEO_update(void) {
-  EA = 0;                                   // disable interrupts
-  NEO_writeColor(neo1, 0, 0);               // NeoPixel 1 lights up red
-  NEO_writeColor(0, neo2, 0);               // NeoPixel 2 lights up green
-  NEO_writeColor(0, 0, neo3);               // NeoPixel 3 lights up blue
-  EA = 1;                                   // enable interrupts
+void NEO_update(struct RGBColor *neo, float *percent, uint8_t state) {
+
+  if (!state) {
+    EA = 0;                  // disable interrupts
+    NEO_writeColor(0, 0, 0); // NeoPixel 1 OFF
+    NEO_writeColor(0, 0, 0); // NeoPixel 2 OFF
+    NEO_writeColor(0, 0, 0); // NeoPixel 3 OFF
+    EA = 1;                  // enable interrupts
+  } else {
+    // percent glowing is not working :(
+    EA = 0;                                       // disable interrupts
+    NEO_writeColor(neo[0].r, neo[0].g, neo[0].b); // NeoPixel 1 lights up red
+    NEO_writeColor(neo[1].r, neo[1].g, neo[1].b); // NeoPixel 2 lights up green
+    NEO_writeColor(neo[2].r, neo[2].g, neo[2].b); // NeoPixel 3 lights up blue
+    EA = 1;                                       // enable interrupts
+  }
 }
 
-// Read EEPROM (stolen from https://github.com/DeqingSun/ch55xduino/blob/ch55xduino/ch55xduino/ch55x/cores/ch55xduino/eeprom.c)
-uint8_t eeprom_read_byte (uint8_t addr){
+// Read EEPROM (stolen from
+// https://github.com/DeqingSun/ch55xduino/blob/ch55xduino/ch55xduino/ch55x/cores/ch55xduino/eeprom.c)
+uint8_t eeprom_read_byte(uint8_t addr) {
   ROM_ADDR_H = DATA_FLASH_ADDR >> 8;
-  ROM_ADDR_L = addr << 1; //Addr must be even
+  ROM_ADDR_L = addr << 1; // Addr must be even
   ROM_CTRL = ROM_CMD_READ;
   return ROM_DATA_L;
+}
+
+void eeprom_write_byte(__data uint8_t addr, __xdata uint8_t val) {
+  if (addr >= 128) {
+    return;
+  }
+  SAFE_MOD = 0x55;
+  SAFE_MOD = 0xAA;        // Enter Safe mode
+  GLOBAL_CFG |= bDATA_WE; // Enable DataFlash write
+  SAFE_MOD = 0;           // Exit Safe mode
+  ROM_ADDR_H = DATA_FLASH_ADDR >> 8;
+  ROM_ADDR_L = addr << 1;
+  ROM_DATA_L = val;
+  if (ROM_STATUS & bROM_ADDR_OK) { // Valid access Address
+    ROM_CTRL = ROM_CMD_WRITE;      // Write
+  }
+  SAFE_MOD = 0x55;
+  SAFE_MOD = 0xAA;         // Enter Safe mode
+  GLOBAL_CFG &= ~bDATA_WE; // Disable DataFlash write
+  SAFE_MOD = 0;            // Exit Safe mode
+}
+
+// handle key press
+void handle_key(uint8_t current, struct key *key, float *neo) {
+  if (current != key->last) { // state changed?
+    key->last = current;      // update last state flag
+    if (current) {            // key was pressed?
+      if (key->type == KEYBOARD) {
+        KBD_code_press(key->mod, key->code); // press keyboard/keypad key
+      } else {
+        CON_press(key->code); // press consumer key
+      }
+      if (neo)
+        *neo = NEO_MAX;
+    } else { // key was released?
+      if (key->type == KEYBOARD) {
+        KBD_code_release(key->mod,
+                         key->code); // release
+      } else {
+        CON_release(key->code); // release
+      }
+    }
+  } else if (key->last) { // key still being pressed?
+                          // if(neo) *neo = NEO_MAX;                 // keep
+                          // NeoPixel on
+  }
 }
 
 // ===================================================================================
@@ -86,124 +171,124 @@ uint8_t eeprom_read_byte (uint8_t addr){
 // ===================================================================================
 void main(void) {
   // Variables
-  __bit key1last = 0;                       // last state of key 1
-  __bit key2last = 0;                       // last state of key 2
-  __bit key3last = 0;                       // last state of key 3
-  __bit knobswitchlast = 0;                 // last state of knob switch
-  __idata uint8_t i;                        // temp variable
-  uint8_t currentKnobKey;                   // current key to be sent by knob
+  struct key keys[KEY_COUNT]; // array of struct for keys
+  struct key *currentKnobKey; // current key to be sent by knob
+  __idata uint8_t i;          // temp variable
+  struct RGBColor buttonColors[LED_COUNT];
+  float percent[LED_COUNT] = {0.0, 0.0, 0.0};
+  int state = 0;
 
   // Enter bootloader if key 1 is pressed
-  NEO_init();                               // init NeoPixels
-  if(!PIN_read(PIN_KEY1)) {                 // key 1 pressed?
-    NEO_latch();                            // make sure pixels are ready
-    for(i=9; i; i--) NEO_sendByte(127);     // light up all pixels
-    BOOT_now();                             // enter bootloader
+  NEO_init();                // init NeoPixels
+  if (!PIN_read(PIN_KEY1)) { // key 1 pressed?
+    NEO_latch();             // make sure pixels are ready
+    for (i = 9; i; i--)
+      NEO_sendByte(255 * NEO_MAX); // light up all pixels
+    BOOT_now();                    // enter bootloader
   }
 
   // Setup
-  CLK_config();                             // configure system clock
-  DLY_ms(5);                                // wait for clock to settle
-  KBD_init();                               // init USB HID keyboard
-  WDT_start();                              // start watchdog timer
+  CLK_config(); // configure system clock
+  DLY_ms(5);    // wait for clock to settle
+  KBD_init();   // init USB HID keyboard
+  WDT_start();  // start watchdog timer
 
   // TODO: Read eeprom for key characters
-  char key1_char = (char)eeprom_read_byte(0);
-  char key2_char = (char)eeprom_read_byte(1);
-  char key3_char = (char)eeprom_read_byte(2);
-  char knobsw_char = (char)eeprom_read_byte(3);
-  char knobclockwise_char = (char)eeprom_read_byte(4);
-  char knobcounterclockwise_char = (char)eeprom_read_byte(5);
+  for (i = 0; i < 6; i++) {
+    keys[i].mod = (char)eeprom_read_byte(i * KEY_EEPROM_FIELDS);
+    keys[i].type = eeprom_read_byte(i * KEY_EEPROM_FIELDS + 1);
+    keys[i].code = (char)eeprom_read_byte(i * KEY_EEPROM_FIELDS + 2);
+    keys[i].last = 0;
+  }
+
+  for (i = 0; i < 3; i++) {
+    buttonColors[i].r =
+        (char)eeprom_read_byte(i * RGB_EEPROM_FIELDS + (RGB_EEPROM_OFFSET));
+    buttonColors[i].g =
+        (char)eeprom_read_byte(i * RGB_EEPROM_FIELDS + 1 + (RGB_EEPROM_OFFSET));
+    buttonColors[i].b =
+        (char)eeprom_read_byte(i * RGB_EEPROM_FIELDS + 2 + (RGB_EEPROM_OFFSET));
+  }
 
   // Loop
-  while(1) {
-    // Handle key 1
-    if(!PIN_read(PIN_KEY1) != key1last) {   // key 1 state changed?
-      key1last = !key1last;                 // update last state flag
-      if(key1last) {                        // key was pressed?
-        neo1 = 127;                         // light up corresponding NeoPixel
-        NEO_update();                       // update NeoPixels NOW!
-        KBD_type(key1_char);                // press and release
-      }
-      else {                                // key was released?
-                                            // nothing to do in this case
-      }
-    }
-    else if(key1last) {                     // key still being pressed?
-      neo1 = 127;                           // keep NeoPixel on
-    }
-
-    // Handle key 2
-    if(!PIN_read(PIN_KEY2) != key2last) {   // key 2 state changed?
-      key2last = !key2last;                 // update last state flag
-      if(key2last) {                        // key was pressed?
-        neo2 = 127;                         // light up corresponding NeoPixel
-        NEO_update();                       // update NeoPixels NOW!
-        KBD_type(key2_char);                // press and release
-      }
-      else {                                // key was released?
-                                            // nothing to do in this case
-      }
-    }
-    else if(key2last) {                     // key still being pressed?
-      neo2 = 127;                           // keep NeoPixel on
-    }
-
-    // Handle key 3
-    if(!PIN_read(PIN_KEY3) != key3last) {   // key 3 state changed?
-      key3last = !key3last;                 // update last state flag
-      if(key3last) {                        // key was pressed?
-        neo3 = 127;                         // light up corresponding NeoPixel
-        NEO_update();                       // update NeoPixels NOW!
-        KBD_type(key3_char);                // press and release
-      }
-      else {                                // key was released?
-                                            // nothing to do in this case
-      }
-    }
-    else if(key3last) {                     // key still being pressed?
-      neo3 = 127;                           // keep NeoPixel on
-    }
-
-    // Handle knob switch
-    if(!PIN_read(PIN_ENC_SW) != knobswitchlast) {
-      knobswitchlast = !knobswitchlast;
-      if(knobswitchlast) {
-        NEO_update();
-        KBD_type(knobsw_char);
-      }
-      else {
-      }
-    }
-    else if(knobswitchlast) {
-    }
+  while (1) {
+    handle_key(!PIN_read(PIN_KEY1), &keys[0], &percent[0]);
+    handle_key(!PIN_read(PIN_KEY2), &keys[1], &percent[1]);
+    handle_key(!PIN_read(PIN_KEY3), &keys[2], &percent[2]);
+    handle_key(!PIN_read(PIN_ENC_SW), &keys[3], (void *)0);
 
     // Handle knob
-    currentKnobKey = 0;                              // clear key variable
-    if(!PIN_read(PIN_ENC_A)) {                       // encoder turned ?
-      if(PIN_read(PIN_ENC_B)) {
-        currentKnobKey = knobclockwise_char;         // clockwise?
+    currentKnobKey = 0;         // clear key variable
+    if (!PIN_read(PIN_ENC_A)) { // encoder turned ?
+      if (PIN_read(PIN_ENC_B)) {
+        currentKnobKey = &keys[4]; // clockwise?
+      } else {
+        currentKnobKey = &keys[5]; // counter-clockwise?
       }
-      else {
-        currentKnobKey = knobcounterclockwise_char;  // counter-clockwise?
-      }
-      DLY_ms(10);                                    // debounce
-      while(!PIN_read(PIN_ENC_A));                   // wait until next detent
+      DLY_ms(10); // debounce
+      while (!PIN_read(PIN_ENC_A))
+        ; // wait until next detent
     }
 
-    if(currentKnobKey) {
-      KBD_press(currentKnobKey);                     // press corresponding key ...
-    }
-    else {
-      KBD_releaseAll();                              // ... or release last key
+    if (currentKnobKey) {
+      if (currentKnobKey->type == KEYBOARD) {
+        KBD_code_type(
+            currentKnobKey->mod,
+            currentKnobKey->code); // press and release corresponding key ...
+      } else {
+        CON_type(
+            currentKnobKey->code); // press and release corresponding key ...
+      }
     }
 
     // Update NeoPixels
-    NEO_update();
-    if(neo1) neo1--;                        // fade down NeoPixel
-    if(neo2) neo2--;                        // fade down NeoPixel
-    if(neo3) neo3--;                        // fade down NeoPixel
-    DLY_ms(5);                              // latch and debounce
-    WDT_reset();                            // reset watchdog
+    NEO_update(buttonColors, percent, state);
+    for (i = 0; i < 3; i++) {
+      if (percent[i] > NEO_GLOW)
+        percent[i] = -0.01; // fade down NeoPixel
+    }
+    DLY_ms(5); // latch and debounce
+
+    // Handle HID Raw data
+    if (HID_available()) { // received data packet?
+      i = HID_available(); // get number of bytes in packet
+      i--;
+      int message = HID_read();
+      switch (message) {
+      case SET_RGB:
+        for (int j = 0; j < i / LED_COUNT; j++) {
+          buttonColors[j].r = HID_read();
+          buttonColors[j].g = HID_read();
+          buttonColors[j].b = HID_read();
+        }
+        break;
+      case PERSIST_COLOR:
+        if (i != 4 * KEY_COUNT) {
+          break;
+        } else {
+          while (i--) {
+            int read = HID_read();
+            if (eeprom_read_byte(RGB_EEPROM_OFFSET + i) != read) {
+              // eeprom_write_byte(RGB_EEPROM_OFFSET + i, read);
+            }
+          }
+        }
+
+        break;
+      default:
+        break;
+      }
+
+      HID_ack(); // acknowledge packet
+    }
+
+    if (!((HID_statusLed() >> 1) & 1)) { // LED Capslock = 1
+      state = 1;
+    } else {
+      state = 0;
+    }
+
+
+    WDT_reset(); // reset watchdog
   }
 }

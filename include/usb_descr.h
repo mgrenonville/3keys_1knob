@@ -38,9 +38,12 @@
 // ===================================================================================
 typedef struct _USB_CFG_DESCR_HID {
   USB_CFG_DESCR config;
-  USB_ITF_DESCR interface0;
+  USB_ITF_DESCR HIDInterface;
   USB_HID_DESCR hid0;
   USB_ENDP_DESCR ep1IN;
+  USB_ENDP_DESCR ep1OUT;
+  USB_ITF_DESCR RawInterface;
+  USB_HID_DESCR RawHid1;
   USB_ENDP_DESCR ep2OUT;
 } USB_CFG_DESCR_HID, *PUSB_CFG_DESCR_HID;
 typedef USB_CFG_DESCR_HID __xdata *PXUSB_CFG_DESCR_HID;
@@ -57,6 +60,12 @@ extern __code uint8_t ReportDescrLen;
 #define USB_REPORT_DESCR      ReportDescr
 #define USB_REPORT_DESCR_LEN  ReportDescrLen
 
+extern __code uint8_t RawHIDReportDescriptor[];
+extern __code uint8_t RawHIDReportDescriptorLen;
+
+#define USB_RAW_HID_REPORT_DESCR      RawHIDReportDescriptor
+#define USB_RAW_HID_REPORT_DESCR_LEN  RawHIDReportDescriptorLen
+
 // ===================================================================================
 // String Descriptors
 // ===================================================================================
@@ -72,3 +81,6 @@ extern __code uint16_t InterfDescr[];
 #define USB_STR_DESCR_i3    (uint8_t*)SerDescr
 #define USB_STR_DESCR_i4    (uint8_t*)InterfDescr
 #define USB_STR_DESCR_ix    (uint8_t*)SerDescr
+
+#define USB_SEND_REPORT_KEYBOARD_PAGE_ID 0x01
+#define USB_SEND_REPORT_CONSUMER_PAGE_ID 0x02

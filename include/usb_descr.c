@@ -35,7 +35,7 @@ __code USB_CFG_DESCR_HID CfgDescr = {
     .bLength            = sizeof(USB_CFG_DESCR),  // size of the descriptor in bytes
     .bDescriptorType    = USB_DESCR_TYP_CONFIG,   // configuration descriptor: 0x02
     .wTotalLength       = sizeof(CfgDescr),       // total length in bytes
-    .bNumInterfaces     = 1,                      // number of interfaces: 1
+    .bNumInterfaces     = 2,                      // number of interfaces: 2
     .bConfigurationValue= 1,                      // value to select this configuration
     .iConfiguration     = 0,                      // no configuration string descriptor
     .bmAttributes       = 0x80,                   // attributes = bus powered, no wakeup
@@ -43,7 +43,7 @@ __code USB_CFG_DESCR_HID CfgDescr = {
   },
 
   // Interface Descriptor
-  .interface0 = {
+  .HIDInterface = {
     .bLength            = sizeof(USB_ITF_DESCR),  // size of the descriptor in bytes: 9
     .bDescriptorType    = USB_DESCR_TYP_INTERF,   // interface descriptor: 0x04
     .bInterfaceNumber   = 0,                      // number of this interface: 0
@@ -70,21 +70,56 @@ __code USB_CFG_DESCR_HID CfgDescr = {
   .ep1IN = {
     .bLength            = sizeof(USB_ENDP_DESCR), // size of the descriptor in bytes: 7
     .bDescriptorType    = USB_DESCR_TYP_ENDP,     // endpoint descriptor: 0x05
-    .bEndpointAddress   = USB_ENDP_ADDR_EP1_IN,   // endpoint: 1, direction: IN (0x01)
+    .bEndpointAddress   = USB_ENDP_ADDR_EP1_IN,   // endpoint: 1, direction: IN (0x81)
     .bmAttributes       = USB_ENDP_TYPE_INTER,    // transfer type: interrupt (0x03)
     .wMaxPacketSize     = EP1_SIZE,               // max packet size
     .bInterval          = 10                      // polling intervall in ms
+  },
+
+  // Endpoint Descriptor: Endpoint 1 (OUT, Interrupt)
+  .ep1OUT = {
+    .bLength            = sizeof(USB_ENDP_DESCR), // size of the descriptor in bytes: 7
+    .bDescriptorType    = USB_DESCR_TYP_ENDP,     // endpoint descriptor: 0x05
+    .bEndpointAddress   = USB_ENDP_ADDR_EP1_OUT,  // endpoint: 1, direction: OUT (0x02)
+    .bmAttributes       = USB_ENDP_TYPE_INTER,    // transfer type: interrupt (0x03)
+    .wMaxPacketSize     = EP1_SIZE,               // max packet size
+    .bInterval          = 10                      // polling intervall in ms
+  },
+  
+   .RawInterface = {
+    .bLength            = sizeof(USB_ITF_DESCR),  // size of the descriptor in bytes: 9
+    .bDescriptorType    = USB_DESCR_TYP_INTERF,   // interface descriptor: 0x04
+    .bInterfaceNumber   = 1,                      // number of this interface: 0
+    .bAlternateSetting  = 0,                      // value used to select alternative setting
+    .bNumEndpoints      = 1,                      // number of endpoints used: 2
+    .bInterfaceClass    = USB_DEV_CLASS_HID,      // interface class: HID (0x03)
+    .bInterfaceSubClass = 0,                      // no boot interface
+    .bInterfaceProtocol = 0,                      //  interface does not belong to a HID boot protocol.
+    .iInterface         = 0                       // no interface string descriptor
+  },
+
+  // HID Descriptor
+  .RawHid1 = {
+    .bLength            = sizeof(USB_HID_DESCR),  // size of the descriptor in bytes: 9
+    .bDescriptorType    = USB_DESCR_TYP_HID,      // HID descriptor: 0x21
+    .bcdHID             = 0x0110,                 // HID class spec version (BCD: 1.1)
+    .bCountryCode       = 33,                     // country code: US
+    .bNumDescriptors    = 1,                      // number of report descriptors: 1
+    .bDescriptorTypeX   = 34,                     // descriptor type: report
+    .wDescriptorLength  = sizeof(RawHIDReportDescriptor)     // report descriptor length
   },
 
   // Endpoint Descriptor: Endpoint 2 (OUT, Interrupt)
   .ep2OUT = {
     .bLength            = sizeof(USB_ENDP_DESCR), // size of the descriptor in bytes: 7
     .bDescriptorType    = USB_DESCR_TYP_ENDP,     // endpoint descriptor: 0x05
-    .bEndpointAddress   = USB_ENDP_ADDR_EP2_OUT,  // endpoint: 1, direction: IN (0x82)
+    .bEndpointAddress   = USB_ENDP_ADDR_EP2_OUT,  // endpoint: 1, direction: OUT (0x02)
     .bmAttributes       = USB_ENDP_TYPE_INTER,    // transfer type: interrupt (0x03)
     .wMaxPacketSize     = EP2_SIZE,               // max packet size
     .bInterval          = 10                      // polling intervall in ms
-  }
+  },
+
+
 };
 
 // ===================================================================================
@@ -94,7 +129,7 @@ __code uint8_t ReportDescr[] ={
     0x05, 0x01,                    // USAGE_PAGE (Generic Desktop)
     0x09, 0x06,                    // USAGE (Keyboard)
     0xa1, 0x01,                    // COLLECTION (Application)
-    0x85, 0x01,                    //   REPORT_ID (1)
+    0x85, USB_SEND_REPORT_KEYBOARD_PAGE_ID,                    //   REPORT_ID (1)
     0x05, 0x07,                    //   USAGE_PAGE (Keyboard)
     0x19, 0xe0,                    //   USAGE_MINIMUM (Keyboard LeftControl)
     0x29, 0xe7,                    //   USAGE_MAXIMUM (Keyboard Right GUI)
@@ -129,7 +164,7 @@ __code uint8_t ReportDescr[] ={
     0x05, 0x0c,                    // USAGE_PAGE (Consumer Devices)
     0x09, 0x01,                    // USAGE (Consumer Control)
     0xa1, 0x01,                    // COLLECTION (Application)
-    0x85, 0x02,                    //   REPORT_ID (2)
+    0x85, USB_SEND_REPORT_CONSUMER_PAGE_ID,                    //   REPORT_ID (2)
     0x15, 0x00,                    //   LOGICAL_MINIMUM (0)
     0x26, 0xff, 0x03,              //   LOGICAL_MAXIMUM (1023)
     0x19, 0x00,                    //   USAGE_MINIMUM (Unassigned)
@@ -139,8 +174,31 @@ __code uint8_t ReportDescr[] ={
     0x81, 0x00,                    //   INPUT (Data,Ary,Abs)
     0xc0                           // END_COLLECTION
 };
-
 __code uint8_t ReportDescrLen = sizeof(ReportDescr);
+
+
+__code uint8_t RawHIDReportDescriptor[] = {
+    // // RAW HID need more check
+    0x06, 0x60,
+    0xFF, // todo: clean up
+    // https://github.com/qmk/qmk_firmware/blob/a4771e4fe4479869a997b130c1435ee072cbc2fa/tmk_core/protocol/vusb/vusb.c#L664
+    0x09, 0x61, 0xa1, 0x01, 0x09, 0x62, 0x15, 0x00, 0x26, 0xFF, 0x00, 0x95,
+    32,         // length: 32
+    0x75, 0x08, // size: 8
+    0x81, 0x06, // INPUT
+    0x09, 0x63,
+    /*
+    0x15, 0x00,
+    0x26, 0xFF, 0x00,
+    0x95, 32,   //REPORT_COUNT(32)
+    0x75, 0x08, //REPORT_SIZE(8)
+    */
+    0x91, 0x83, // OUTPUT
+    0xC0        // End Collection (Application)
+
+};
+
+__code uint8_t RawHIDReportDescriptorLen = sizeof(RawHIDReportDescriptor);
 
 // ===================================================================================
 // String Descriptors
